@@ -7,29 +7,45 @@
   </head>
   <body>
     <div id="app">
-      <canvas id="battlefield" width="1250" height="800" aria-label="Siege battlefield"></canvas>
+      <div id="battlefield" role="img" aria-label="Siege battlefield"></div>
       <section id="hud" class="hud">
+        <div class="title-strip">
+          <span class="title-rule"></span>
+          <strong>Siege of the Crown</strong>
+          <span class="title-rule"></span>
+        </div>
         <div class="top-row">
-          <div class="crest dwarves">DWARVES</div>
-          <div class="pot">
-            <span>Jackpot</span>
+          <div class="crest dwarves">
+            <b>◆</b>
+            <span>DWARVES</span>
+            <small>Iron Vanguard</small>
+          </div>
+          <div class="pot jackpot-card">
+            <span>War Jackpot</span>
             <strong id="jackpot">Ξ0.0000</strong>
           </div>
-          <div class="timer" id="timer">--:--</div>
+          <div class="timer-card">
+            <span>Curse Clock</span>
+            <strong class="timer" id="timer">--:--</strong>
+          </div>
           <div class="pot bonus">
-            <span>Bonus Pool</span>
+            <span>70% Bonus Pool</span>
             <strong id="bonus">Ξ0.0000</strong>
           </div>
-          <div class="crest orcs">ORCS</div>
+          <div class="crest orcs">
+            <b>◆</b>
+            <span>ORCS</span>
+            <small>Ashen Horde</small>
+          </div>
         </div>
 
         <div class="bars">
-          <div class="bar-label" id="dwarfPct">50.00%</div>
+          <div class="bar-label dwarves-label" id="dwarfPct">50.00%</div>
           <div class="ownership">
             <div id="dwarfBar"></div>
             <div id="orcBar"></div>
           </div>
-          <div class="bar-label" id="orcPct">50.00%</div>
+          <div class="bar-label orcs-label" id="orcPct">50.00%</div>
         </div>
 
         <div class="structure">
@@ -42,8 +58,6 @@
           <span>Orc Keep</span>
         </div>
 
-        <div id="status" class="status">Configure VITE_CONTRACT_ADDRESS to read the game.</div>
-
         <div class="actions">
           <button id="connect">Connect Wallet</button>
           <label>
@@ -54,6 +68,8 @@
           <button id="pushOrcs">Push Orcs (<span id="orcPrice">--</span>)</button>
           <button id="claim">Claim Victory Share</button>
         </div>
+
+        <div id="status" class="status">Configure VITE_CONTRACT_ADDRESS to read the game.</div>
       </section>
 
       <div id="victory" class="victory hidden">

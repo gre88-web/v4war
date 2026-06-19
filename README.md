@@ -10,7 +10,7 @@ This repository implements **Phase 1** from the build brief:
 - Foundry contract with pull-only pro-rata payouts.
 - Full Foundry test suite for pricing, win conditions, timer behavior, bonuses,
   payouts, reentrancy, and edge cases.
-- Vite/ethers canvas frontend that reads `gameState()` and contract events, then
+- Vite/ethers/Phaser frontend that reads `gameState()` and contract events, then
   submits exact quoted `push()` and `claim()` transactions.
 
 Phase 2 (Uniswap v4 hook/token flywheel) is intentionally not included in this
@@ -27,8 +27,9 @@ Phase 1 implementation.
   wins: Dwarves when `front >= 5000`, otherwise Orcs.
 - Winners claim with pull payments. Losers get no payout.
 
-The client-side jagged frontline, sprites, particles, castle art, goal rings,
-screen shake, and map terrain are cosmetic. Ownership is derived from `front`.
+The client-side jagged frontline, Phaser sprites, particles, castle art, goal
+rings, screen shake, and map terrain are cosmetic. Ownership is derived from
+`front`.
 
 ## Economic constants
 
