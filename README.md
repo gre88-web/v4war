@@ -27,9 +27,9 @@ Phase 1 implementation.
   wins: Dwarves when `front >= 5000`, otherwise Orcs.
 - Winners claim with pull payments. Losers get no payout.
 
-The client-side jagged frontline, Phaser sprites, particles, castle art, goal
-rings, screen shake, and map terrain are cosmetic. Ownership is derived from
-`front`.
+The client-side jagged hex frontline, Phaser sprites/counters, particles,
+castle art, goal rings, screen shake, and operational hex-map terrain are
+cosmetic. Ownership is derived from `front`.
 
 ## Economic constants
 

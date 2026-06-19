@@ -22,6 +22,8 @@ const ORCS = 1;
 const TOTAL_TILES = 10_000;
 const FIELD_WIDTH = 125;
 const FIELD_HEIGHT = 80;
+const HEX_COLS = 52;
+const HEX_ROWS = 30;
 const SEED = 0xC0FFEE;
 
 const configuredAddress = import.meta.env.VITE_CONTRACT_ADDRESS ?? "";
@@ -46,11 +48,21 @@ type GameState = {
 
 type UnitActor = {
   side: number;
-  lane: number;
-  offset: number;
+  row: number;
+  columnOffset: number;
   phase: number;
   charge: number;
   container: Phaser.GameObjects.Container;
+};
+
+type HexMetrics = {
+  size: number;
+  width: number;
+  height: number;
+  xStep: number;
+  yStep: number;
+  originX: number;
+  originY: number;
 };
 
 const state: GameState = {
@@ -323,17 +335,20 @@ class BattleScene extends Phaser.Scene {
 
   playPushEffect(faction: number, text: string): void {
     const { width, height } = this.dimensions();
-    const x = this.frontX(width);
-    const y = height * (0.28 + pseudoRandom(this.currentState.front + SEED) * 0.5);
-    const color = faction === DWARVES ? 0x83d6ff : 0xff7048;
+    const hex = this.hexMetrics(width, height);
+    const row = Math.floor(pseudoRandom(this.currentState.front + SEED + this.time.now) * HEX_ROWS);
+    const center = this.hexCenter(Math.floor(this.frontColumnForRow(row, this.time.now)), row, hex);
+    const x = center.x;
+    const y = center.y;
+    const color = faction === DWARVES ? 0x0036ff : 0xff0000;
     const sparks = this.add.particles(x, y, "spark", {
       lifespan: { min: 360, max: 920 },
       speed: { min: 80, max: 410 },
-      angle: faction === DWARVES ? { min: -60, max: 55 } : { min: 125, max: 235 },
+      angle: faction === DWARVES ? { min: -35, max: 45 } : { min: 135, max: 215 },
       gravityY: 320,
       scale: { start: 1.35, end: 0 },
       alpha: { start: 0.95, end: 0 },
-      tint: [color, 0xffd66e, 0x8e1424],
+      tint: [color, 0xffdf5c, 0xffffff],
       quantity: 48,
       blendMode: Phaser.BlendModes.ADD,
     });
@@ -346,7 +361,7 @@ class BattleScene extends Phaser.Scene {
     for (const unit of this.units.filter((actor) => actor.side === faction)) {
       this.tweens.add({
         targets: unit,
-        charge: faction === DWARVES ? 34 : -34,
+        charge: faction === DWARVES ? hex.xStep * 0.65 : -hex.xStep * 0.65,
         duration: 140,
         yoyo: true,
         ease: "Back.easeOut",
@@ -367,51 +382,38 @@ class BattleScene extends Phaser.Scene {
 
   private drawScene(time: number): void {
     const { width, height, tileW, tileH } = this.dimensions();
-    this.drawTerrain(width, height, tileW, tileH);
+    const hex = this.hexMetrics(width, height);
+    this.drawTerrain(width, height, hex, time);
     this.drawScenery(width, height, tileW, tileH, time);
-    this.drawKeeps(width, height, tileW, tileH, time);
-    this.drawFront(width, height, tileH, time);
+    this.drawKeeps(width, height, hex, time);
+    this.drawFront(hex, time);
     this.drawAtmosphere(width, height, time);
   }
 
-  private drawTerrain(width: number, height: number, tileW: number, tileH: number): void {
+  private drawTerrain(width: number, height: number, hex: HexMetrics, time: number): void {
     this.terrain.clear();
-    this.terrain.fillStyle(0x040712, 1);
+    this.terrain.fillStyle(0x7c8f64, 1);
     this.terrain.fillRect(0, 0, width, height);
+    this.drawSea(width, height, hex);
 
-    for (let x = 0; x < FIELD_WIDTH; x += 1) {
-      for (let y = 0; y < FIELD_HEIGHT; y += 1) {
-        const index = x * FIELD_HEIGHT + y;
-        const dwarfOwned = index < this.renderedFront;
-        const noise = pseudoRandom(x * 29 + y * 83 + SEED);
-        const palette = dwarfOwned
-          ? [0x24563d, 0x2f7046, 0x3b8350, 0x1e4962, 0x486c39]
-          : [0x522a27, 0x623027, 0x3b2630, 0x714128, 0x27242d];
-        const color = palette[Math.floor(noise * palette.length)];
-        const alpha = 0.82 + pseudoRandom(y * 47 + x * 11) * 0.16;
-        this.terrain.fillStyle(color, alpha);
-        this.terrain.fillRect(x * tileW, y * tileH, Math.ceil(tileW), Math.ceil(tileH));
+    for (let col = 0; col < HEX_COLS; col += 1) {
+      for (let row = 0; row < HEX_ROWS; row += 1) {
+        const center = this.hexCenter(col, row, hex);
+        const owner = this.hexOwner(col, row, time);
+        const base = this.hexTerrainColor(col, row);
+        this.drawHex(this.terrain, center.x, center.y, hex.size, base, 0.98, 0x314124, 0.2);
+
+        if (owner === DWARVES) {
+          this.drawHex(this.terrain, center.x, center.y, hex.size * 0.86, 0x124bb4, 0.18, 0x124bb4, 0.12);
+        } else {
+          this.drawHex(this.terrain, center.x, center.y, hex.size * 0.86, 0xb30012, 0.18, 0xb30012, 0.12);
+        }
+
+        this.drawHexDetails(center.x, center.y, hex.size, col, row);
       }
     }
 
-    this.terrain.fillStyle(0x061226, 0.42);
-    this.terrain.fillRect(0, 0, width, height * 0.12);
-    this.terrain.fillStyle(0x000000, 0.22);
-    this.terrain.fillRect(0, height * 0.82, width, height * 0.18);
-    this.drawDiagonalRoad(width, height);
-  }
-
-  private drawDiagonalRoad(width: number, height: number): void {
-    this.terrain.lineStyle(18, 0x716252, 0.28);
-    this.terrain.beginPath();
-    this.terrain.moveTo(width * 0.04, height * 0.74);
-    this.terrain.lineTo(width * 0.32, height * 0.58);
-    this.terrain.lineTo(width * 0.51, height * 0.52);
-    this.terrain.lineTo(width * 0.71, height * 0.47);
-    this.terrain.lineTo(width * 0.96, height * 0.24);
-    this.terrain.strokePath();
-    this.terrain.lineStyle(4, 0xd8c895, 0.18);
-    this.terrain.strokePath();
+    this.drawOperationalLines(hex, time);
   }
 
   private drawScenery(
@@ -422,62 +424,45 @@ class BattleScene extends Phaser.Scene {
     time: number,
   ): void {
     this.scenery.clear();
-    for (let i = 0; i < 18; i += 1) {
-      this.drawMountain((0.04 + i * 0.026) * width, (0.08 + Math.sin(i) * 0.035) * height, tileW);
+    for (let i = 0; i < 28; i += 1) {
+      this.drawMountain((0.04 + i * 0.025) * width, (0.09 + Math.sin(i) * 0.026) * height, tileW * 0.7);
     }
-    for (let i = 0; i < 44; i += 1) {
-      this.drawPine(
-        (0.07 + ((i * 17) % 43) / 100) * width,
-        (0.25 + ((i * 31) % 50) / 100) * height,
-        tileW * (1.1 + pseudoRandom(i) * 0.9),
-      );
-    }
-    for (let i = 0; i < 30; i += 1) {
-      this.drawDeadTree(
-        (0.67 + ((i * 13) % 28) / 100) * width,
-        (0.2 + ((i * 23) % 58) / 100) * height,
-        tileW * (1 + pseudoRandom(i + 5) * 0.75),
-      );
-    }
-    this.drawVolcano(width * 0.84, height * 0.18, tileW, tileH, time);
+    this.drawVolcano(width * 0.86, height * 0.19, tileW * 0.8, tileH, time);
     this.drawRiver(width, height, time);
   }
 
-  private drawKeeps(width: number, height: number, tileW: number, tileH: number, time: number): void {
+  private drawKeeps(width: number, height: number, hex: HexMetrics, time: number): void {
     this.keeps.clear();
-    this.drawFortress(width * 0.055, height * 0.53, tileW * 1.18, 0x9cb7cf, 0x2868be);
-    this.drawFortress(width * 0.92, height * 0.53, tileW * 1.18, 0x54414a, 0xb8422a);
-    this.drawCrownKeep(width * 0.5, height * 0.51, tileW, tileH, time);
+    this.drawFortress(width * 0.055, height * 0.55, hex.size * 0.7, 0xd5d1ad, 0x0036ff);
+    this.drawFortress(width * 0.92, height * 0.55, hex.size * 0.7, 0x6d5943, 0xff0000);
+    this.drawCrownKeep(width * 0.5, height * 0.52, hex.size * 0.78, time);
     this.drawGoalAura(width * 0.055, height * 0.53, time, 0x83d6ff);
     this.drawGoalAura(width * 0.945, height * 0.53, time, 0xff7048);
   }
 
-  private drawFront(width: number, height: number, tileH: number, time: number): void {
-    const baseX = this.frontX(width);
+  private drawFront(hex: HexMetrics, time: number): void {
     this.frontLine.clear();
-    this.frontLine.lineStyle(18, 0xffbc45, 0.12);
-    this.traceFront(baseX, tileH, time);
-    this.frontLine.lineStyle(9, 0xffd66e, 0.34);
-    this.traceFront(baseX, tileH, time + 44);
-    this.frontLine.lineStyle(4, 0xfff0b0, 0.92);
-    this.traceFront(baseX, tileH, time + 88);
-
-    for (let i = 0; i < 18; i += 1) {
-      const y = (i / 17) * height;
-      const wobble = this.frontWobble(i * 5, time);
-      this.frontLine.fillStyle(i % 2 === 0 ? 0xffd66e : 0x83d6ff, 0.45);
-      this.frontLine.fillCircle(baseX + wobble, y, 2.5 + Math.sin(time / 130 + i) * 1.2);
+    for (let row = 0; row < HEX_ROWS; row += 1) {
+      const boundary = this.frontColumnForRow(row, time);
+      const center = this.hexCenter(Math.floor(boundary), row, hex);
+      this.frontLine.lineStyle(4, 0x0b1230, 0.78);
+      this.frontLine.strokeCircle(center.x, center.y, hex.size * 0.56);
+      this.frontLine.lineStyle(2, 0xffdf5c, 0.72);
+      this.frontLine.strokeCircle(center.x, center.y, hex.size * 0.42);
+      if (row % 2 === 0) {
+        this.frontLine.fillStyle(0xffdf5c, 0.85);
+        this.frontLine.fillRect(center.x - 2, center.y - hex.size * 0.58, 4, hex.size * 1.16);
+      }
     }
-  }
 
-  private traceFront(baseX: number, tileH: number, time: number): void {
+    this.frontLine.lineStyle(5, 0xffdf5c, 0.38);
     this.frontLine.beginPath();
-    for (let y = 0; y <= FIELD_HEIGHT; y += 1) {
-      const x = baseX + this.frontWobble(y, time);
-      if (y === 0) {
-        this.frontLine.moveTo(x, y * tileH);
+    for (let row = 0; row < HEX_ROWS; row += 1) {
+      const center = this.hexCenter(Math.floor(this.frontColumnForRow(row, time)), row, hex);
+      if (row === 0) {
+        this.frontLine.moveTo(center.x, center.y);
       } else {
-        this.frontLine.lineTo(x, y * tileH);
+        this.frontLine.lineTo(center.x, center.y);
       }
     }
     this.frontLine.strokePath();
@@ -485,19 +470,19 @@ class BattleScene extends Phaser.Scene {
 
   private drawAtmosphere(width: number, height: number, time: number): void {
     this.atmosphere.clear();
-    this.atmosphere.fillStyle(0x83d6ff, 0.04 + Math.sin(time / 760) * 0.015);
-    this.atmosphere.fillRect(0, 0, width * 0.48, height);
-    this.atmosphere.fillStyle(0xff7048, 0.05 + Math.cos(time / 740) * 0.018);
-    this.atmosphere.fillRect(width * 0.52, 0, width * 0.48, height);
-    this.atmosphere.lineStyle(1, 0xffffff, 0.035);
-    for (let i = 0; i < 32; i += 1) {
-      const y = ((i * 97 + time / 80) % height) - 20;
-      this.atmosphere.lineBetween(0, y, width, y + Math.sin(i) * 26);
+    this.atmosphere.fillStyle(0x0036ff, 0.035 + Math.sin(time / 760) * 0.012);
+    this.atmosphere.fillRect(0, 0, width * 0.5, height);
+    this.atmosphere.fillStyle(0xff0000, 0.038 + Math.cos(time / 740) * 0.012);
+    this.atmosphere.fillRect(width * 0.5, 0, width * 0.5, height);
+    this.atmosphere.lineStyle(1, 0x162312, 0.14);
+    for (let i = 0; i < 44; i += 1) {
+      const x = (i * 97 + time / 90) % width;
+      this.atmosphere.lineBetween(x, 0, x + Math.sin(i) * 18, height);
     }
   }
 
   private createUnits(): void {
-    for (let i = 0; i < 14; i += 1) {
+    for (let i = 0; i < 24; i += 1) {
       this.units.push(this.createUnit(DWARVES, i));
       this.units.push(this.createUnit(ORCS, i));
     }
@@ -505,17 +490,29 @@ class BattleScene extends Phaser.Scene {
 
   private createUnit(side: number, index: number): UnitActor {
     const container = this.add.container(0, 0);
-    const shadow = this.add.ellipse(0, 19, 42, 13, 0x000000, 0.32);
-    const sprite = this.add.image(0, 0, side === DWARVES ? "dwarf-knight" : "orc-beast");
-    sprite.setScale(side === DWARVES ? 1.45 : 1.55);
+    const shadow = this.add.rectangle(3, 5, 26, 22, 0x000000, 0.35);
+    const counter = this.add.image(0, 0, side === DWARVES ? "dwarf-counter" : "orc-counter");
+    counter.setScale(1.18);
+    const sprite = this.add.image(side === DWARVES ? -3 : 3, -8, side === DWARVES ? "dwarf-knight" : "orc-beast");
+    sprite.setScale(side === DWARVES ? 0.58 : 0.62);
     sprite.setFlipX(side === ORCS);
-    container.add([shadow, sprite]);
+    const label = this.add
+      .text(0, 10, side === DWARVES ? "DW" : "OR", {
+        fontFamily: "Courier New, monospace",
+        fontSize: "9px",
+        fontStyle: "900",
+        color: "#ffffff",
+        stroke: "#101010",
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5);
+    container.add([shadow, counter, sprite, label]);
     this.unitLayer.add(container);
 
     const actor: UnitActor = {
       side,
-      lane: index,
-      offset: 42 + (index % 4) * 31 + pseudoRandom(index * 13 + side) * 42,
+      row: (index * 5 + side * 3) % HEX_ROWS,
+      columnOffset: 1 + (index % 5),
       phase: pseudoRandom(index * 37 + side * 101) * Math.PI * 2,
       charge: 0,
       container,
@@ -526,15 +523,18 @@ class BattleScene extends Phaser.Scene {
 
   private updateUnits(time: number): void {
     const { width, height } = this.dimensions();
-    const front = this.frontX(width);
+    const hex = this.hexMetrics(width, height);
     for (const unit of this.units) {
-      const lanePct = 0.16 + ((unit.lane * 0.061) % 0.68);
-      const squadDrift = Math.sin(time / 710 + unit.phase) * 10;
-      const sideSign = unit.side === DWARVES ? -1 : 1;
-      unit.container.x = front + sideSign * unit.offset + unit.charge + squadDrift;
-      unit.container.y = lanePct * height + Math.sin(time / 180 + unit.phase) * 5;
+      const frontCol = Math.floor(this.frontColumnForRow(unit.row, time));
+      const col =
+        unit.side === DWARVES
+          ? Phaser.Math.Clamp(frontCol - unit.columnOffset, 1, HEX_COLS - 2)
+          : Phaser.Math.Clamp(frontCol + unit.columnOffset, 1, HEX_COLS - 2);
+      const center = this.hexCenter(col, unit.row, hex);
+      unit.container.x = center.x + unit.charge + Math.sin(time / 710 + unit.phase) * 3;
+      unit.container.y = center.y + Math.sin(time / 180 + unit.phase) * 2;
       unit.container.setDepth(unit.container.y);
-      unit.container.rotation = Math.sin(time / 290 + unit.phase) * 0.035;
+      unit.container.rotation = Math.sin(time / 290 + unit.phase) * 0.025;
       unit.container.setAlpha(unit.container.x > 24 && unit.container.x < width - 24 ? 1 : 0);
     }
   }
@@ -589,10 +589,36 @@ class BattleScene extends Phaser.Scene {
     g.generateTexture("orc-beast", 72, 64);
     g.clear();
 
+    this.drawCounterTexture(g, "dwarf-counter", 0x0036ff, 0x9bdfff);
+    this.drawCounterTexture(g, "orc-counter", 0xff0000, 0xffb09b);
+
     g.fillStyle(0xffffff, 1);
     g.fillCircle(4, 4, 4);
     g.generateTexture("spark", 8, 8);
     g.destroy();
+  }
+
+  private drawCounterTexture(
+    g: Phaser.GameObjects.Graphics,
+    key: string,
+    fill: number,
+    accent: number,
+  ): void {
+    g.clear();
+    g.fillStyle(0x000000, 0);
+    g.fillRect(0, 0, 34, 30);
+    g.fillStyle(0x050505, 0.48);
+    g.fillRect(4, 5, 28, 23);
+    g.fillStyle(fill, 1);
+    g.fillRect(2, 2, 28, 22);
+    g.lineStyle(2, 0xffffff, 0.86);
+    g.strokeRect(2, 2, 28, 22);
+    g.lineStyle(1, accent, 0.95);
+    g.strokeRect(5, 5, 22, 16);
+    g.lineBetween(8, 19, 24, 8);
+    g.lineBetween(9, 8, 24, 19);
+    g.generateTexture(key, 34, 30);
+    g.clear();
   }
 
   private drawMountain(x: number, y: number, s: number): void {
@@ -602,27 +628,6 @@ class BattleScene extends Phaser.Scene {
     this.scenery.fillTriangle(x + s * 4, y, x + s * 2.8, y + s * 2.8, x + s * 5.4, y + s * 2.7);
     this.scenery.fillStyle(0x1b2b38, 0.22);
     this.scenery.fillTriangle(x + s * 4, y, x + s * 9, y + s * 8, x + s * 5.4, y + s * 2.7);
-  }
-
-  private drawPine(x: number, y: number, s: number): void {
-    this.scenery.fillStyle(0x261711, 1);
-    this.scenery.fillRect(x + s * 1.6, y + s * 3.1, s * 0.7, s * 3.8);
-    this.scenery.fillStyle(0x143d2b, 0.95);
-    this.scenery.fillTriangle(x, y + s * 4.8, x + s * 2, y, x + s * 4, y + s * 4.8);
-    this.scenery.fillStyle(0x246842, 0.9);
-    this.scenery.fillTriangle(x + s * 0.3, y + s * 3.2, x + s * 2, y + s * 0.8, x + s * 3.7, y + s * 3.2);
-  }
-
-  private drawDeadTree(x: number, y: number, s: number): void {
-    this.scenery.lineStyle(Math.max(2, s * 0.32), 0x171014, 0.9);
-    this.scenery.beginPath();
-    this.scenery.moveTo(x + s * 2, y + s * 6.5);
-    this.scenery.lineTo(x + s * 2, y);
-    this.scenery.moveTo(x + s * 2, y + s * 2);
-    this.scenery.lineTo(x, y + s * 0.7);
-    this.scenery.moveTo(x + s * 2, y + s * 3.2);
-    this.scenery.lineTo(x + s * 4.2, y + s * 1.2);
-    this.scenery.strokePath();
   }
 
   private drawVolcano(x: number, y: number, s: number, tileH: number, time: number): void {
@@ -674,10 +679,10 @@ class BattleScene extends Phaser.Scene {
     this.keeps.fillRect(x + s * 3, y - s * 4, s * 1.2, s * 1.2);
   }
 
-  private drawCrownKeep(width: number, height: number, tileW: number, tileH: number, time: number): void {
+  private drawCrownKeep(width: number, height: number, size: number, time: number): void {
     const x = width;
     const y = height;
-    const s = tileW * 1.15;
+    const s = size;
     const pulse = 0.48 + Math.sin(time / 190) * 0.17;
     this.keeps.lineStyle(3, 0xffd66e, pulse);
     this.keeps.strokeCircle(x, y, s * 12);
@@ -704,7 +709,7 @@ class BattleScene extends Phaser.Scene {
     this.keeps.fillTriangle(x - s * 1.6, y - s * 16, x, y - s * 21, x + s * 1.6, y - s * 16);
     this.keeps.fillTriangle(x + s * 4, y - s * 12, x + s * 5.5, y - s * 16, x + s * 7, y - s * 12);
     this.keeps.lineStyle(2, 0xfff1b3, 0.5);
-    this.keeps.lineBetween(x, y - s * 20, x, y - s * 26 - Math.sin(time / 220) * tileH);
+    this.keeps.lineBetween(x, y - s * 20, x, y - s * 25 - Math.sin(time / 220) * s * 0.9);
   }
 
   private drawGoalAura(x: number, y: number, time: number, color: number): void {
@@ -753,6 +758,174 @@ class BattleScene extends Phaser.Scene {
     });
   }
 
+  private drawSea(width: number, height: number, hex: HexMetrics): void {
+    this.terrain.fillStyle(0x6f9da0, 0.95);
+    this.terrain.beginPath();
+    this.terrain.moveTo(0, 0);
+    this.terrain.lineTo(width * 0.27, 0);
+    this.terrain.lineTo(width * 0.22, height * 0.14);
+    this.terrain.lineTo(width * 0.11, height * 0.16);
+    this.terrain.lineTo(width * 0.04, height * 0.09);
+    this.terrain.lineTo(0, height * 0.12);
+    this.terrain.closePath();
+    this.terrain.fillPath();
+
+    this.terrain.beginPath();
+    this.terrain.moveTo(width, height * 0.77);
+    this.terrain.lineTo(width, height);
+    this.terrain.lineTo(width * 0.67, height);
+    this.terrain.lineTo(width * 0.71, height * 0.9);
+    this.terrain.lineTo(width * 0.82, height * 0.84);
+    this.terrain.closePath();
+    this.terrain.fillPath();
+
+    this.terrain.lineStyle(2, 0x2d5964, 0.35);
+    this.terrain.strokeRect(hex.originX - hex.width, hex.originY - hex.height, width + hex.width * 2, height + hex.height * 2);
+  }
+
+  private drawOperationalLines(hex: HexMetrics, time: number): void {
+    this.terrain.lineStyle(3, 0x6e6f4f, 0.42);
+    this.terrain.beginPath();
+    for (let i = 0; i < 12; i += 1) {
+      const point = this.hexCenter(4 + i * 4, 21 - Math.floor(i / 2), hex);
+      if (i === 0) {
+        this.terrain.moveTo(point.x, point.y);
+      } else {
+        this.terrain.lineTo(point.x, point.y);
+      }
+    }
+    this.terrain.strokePath();
+
+    this.terrain.lineStyle(2, 0x3c7b8a, 0.58);
+    this.terrain.beginPath();
+    for (let i = 0; i < 17; i += 1) {
+      const point = this.hexCenter(9 + i * 2, 2 + ((i * 3) % 20), hex);
+      if (i === 0) {
+        this.terrain.moveTo(point.x, point.y);
+      } else {
+        this.terrain.lineTo(point.x + Math.sin(time / 900 + i) * 2, point.y);
+      }
+    }
+    this.terrain.strokePath();
+  }
+
+  private drawHexDetails(x: number, y: number, size: number, col: number, row: number): void {
+    const n = pseudoRandom(col * 733 + row * 131 + SEED);
+    if (n > 0.72) {
+      this.terrain.lineStyle(1, 0x244222, 0.62);
+      for (let i = 0; i < 3; i += 1) {
+        const dx = (i - 1) * size * 0.22;
+        this.terrain.lineBetween(x + dx - size * 0.16, y + size * 0.16, x + dx, y - size * 0.18);
+        this.terrain.lineBetween(x + dx, y - size * 0.18, x + dx + size * 0.16, y + size * 0.16);
+      }
+    } else if (n < 0.12) {
+      this.terrain.fillStyle(0x526e76, 0.36);
+      this.terrain.fillRect(x - size * 0.34, y - size * 0.06, size * 0.68, size * 0.12);
+      this.terrain.fillRect(x - size * 0.06, y - size * 0.34, size * 0.12, size * 0.68);
+    } else if (n > 0.42 && n < 0.5) {
+      this.terrain.lineStyle(1, 0x765f42, 0.54);
+      this.terrain.lineBetween(x - size * 0.42, y + size * 0.2, x + size * 0.42, y - size * 0.2);
+    }
+  }
+
+  private drawHex(
+    target: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    size: number,
+    fill: number,
+    alpha: number,
+    stroke: number,
+    strokeAlpha: number,
+  ): void {
+    const points = this.hexPoints(x, y, size);
+    target.fillStyle(fill, alpha);
+    target.beginPath();
+    target.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i += 1) {
+      target.lineTo(points[i].x, points[i].y);
+    }
+    target.closePath();
+    target.fillPath();
+    target.lineStyle(1, stroke, strokeAlpha);
+    target.beginPath();
+    target.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i += 1) {
+      target.lineTo(points[i].x, points[i].y);
+    }
+    target.closePath();
+    target.strokePath();
+  }
+
+  private hexPoints(x: number, y: number, size: number): Phaser.Math.Vector2[] {
+    const points: Phaser.Math.Vector2[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      const angle = Phaser.Math.DegToRad(60 * i);
+      points.push(new Phaser.Math.Vector2(x + size * Math.cos(angle), y + size * Math.sin(angle)));
+    }
+    return points;
+  }
+
+  private hexCenter(col: number, row: number, hex: HexMetrics): Phaser.Math.Vector2 {
+    return new Phaser.Math.Vector2(
+      hex.originX + col * hex.xStep,
+      hex.originY + row * hex.yStep + (col % 2) * (hex.yStep / 2),
+    );
+  }
+
+  private hexMetrics(width: number, height: number): HexMetrics {
+    const widthSize = width / (HEX_COLS * 1.5 + 0.5);
+    const heightSize = height / ((HEX_ROWS + 0.75) * Math.sqrt(3));
+    const size = Math.max(7, Math.min(widthSize, heightSize) * 1.12);
+    const hexWidth = size * 2;
+    const hexHeight = Math.sqrt(3) * size;
+    const mapWidth = (HEX_COLS - 1) * size * 1.5 + hexWidth;
+    const mapHeight = (HEX_ROWS + 0.5) * hexHeight;
+    return {
+      size,
+      width: hexWidth,
+      height: hexHeight,
+      xStep: size * 1.5,
+      yStep: hexHeight,
+      originX: (width - mapWidth) / 2 + size,
+      originY: (height - mapHeight) / 2 + hexHeight * 0.62,
+    };
+  }
+
+  private hexOwner(col: number, row: number, time: number): number {
+    return col <= this.frontColumnForRow(row, time) ? DWARVES : ORCS;
+  }
+
+  private frontColumnForRow(row: number, time: number): number {
+    const base = (this.renderedFront / TOTAL_TILES) * (HEX_COLS - 1);
+    const noise = (pseudoRandom(row * 101 + SEED) - 0.5) * 5.4;
+    const wave = Math.sin(time / 950 + row * 0.63) * 1.1;
+    return Phaser.Math.Clamp(base + noise + wave, 0, HEX_COLS - 1);
+  }
+
+  private hexTerrainColor(col: number, row: number): number {
+    const n = pseudoRandom(col * 19 + row * 79 + SEED);
+    if (col < 8 && row < 5) {
+      return 0x6f9da0;
+    }
+    if (col > 38 && row > 23) {
+      return 0x6f9da0;
+    }
+    if (n > 0.84) {
+      return 0x5d7446;
+    }
+    if (n > 0.68) {
+      return 0x8fa06b;
+    }
+    if (n < 0.13) {
+      return 0x6f8e74;
+    }
+    if (n < 0.23) {
+      return 0xb49a6e;
+    }
+    return 0x9aaa6f;
+  }
+
   private dimensions(): { width: number; height: number; tileW: number; tileH: number } {
     const width = Math.max(320, this.scale.width);
     const height = Math.max(240, this.scale.height);
@@ -764,13 +937,6 @@ class BattleScene extends Phaser.Scene {
     };
   }
 
-  private frontX(width: number): number {
-    return Phaser.Math.Clamp((this.renderedFront / TOTAL_TILES) * width, 0, width);
-  }
-
-  private frontWobble(row: number, time: number): number {
-    return (pseudoRandom(row * 101 + SEED) - 0.5) * 26 + Math.sin(time / 310 + row * 0.7) * 5;
-  }
 }
 
 function readTilesInput(): bigint {
