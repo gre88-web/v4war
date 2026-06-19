@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Siege of the Crown</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="battlefield" width="1250" height="800" aria-label="Siege battlefield"></canvas>
+      <section id="hud" class="hud">
+        <div class="top-row">
+          <div class="crest dwarves">DWARVES</div>
+          <div class="pot">
+            <span>Jackpot</span>
+            <strong id="jackpot">Ξ0.0000</strong>
+          </div>
+          <div class="timer" id="timer">--:--</div>
+          <div class="pot bonus">
+            <span>Bonus Pool</span>
+            <strong id="bonus">Ξ0.0000</strong>
+          </div>
+          <div class="crest orcs">ORCS</div>
+        </div>
+
+        <div class="bars">
+          <div class="bar-label" id="dwarfPct">50.00%</div>
+          <div class="ownership">
+            <div id="dwarfBar"></div>
+            <div id="orcBar"></div>
+          </div>
+          <div class="bar-label" id="orcPct">50.00%</div>
+        </div>
+
+        <div class="structure">
+          <span>Dwarf Keep</span>
+          <div class="track">
+            <i class="tick tick-left">70%</i>
+            <b id="frontMarker"></b>
+            <i class="tick tick-right">70%</i>
+          </div>
+          <span>Orc Keep</span>
+        </div>
+
+        <div id="status" class="status">Configure VITE_CONTRACT_ADDRESS to read the game.</div>
+
+        <div class="actions">
+          <button id="connect">Connect Wallet</button>
+          <label>
+            Tiles
+            <input id="tiles" type="number" min="1" max="5000" value="1" />
+          </label>
+          <button id="pushDwarves">Push Dwarves (<span id="dwarfPrice">--</span>)</button>
+          <button id="pushOrcs">Push Orcs (<span id="orcPrice">--</span>)</button>
+          <button id="claim">Claim Victory Share</button>
+        </div>
+      </section>
+
+      <div id="victory" class="victory hidden">
+        <h1 id="victoryTitle">FACTION VICTORIOUS</h1>
+        <p id="victoryText">Split pro-rata.</p>
+      </div>
+    </div>
+    <script type="module" src="/web/src/main.ts"></script>
+  </body>
+</html>

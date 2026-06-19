@@ -1,0 +1,353 @@
+:root {
+  color: #f5ead2;
+  background: #090b12;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background:
+    radial-gradient(circle at 20% 50%, rgba(86, 181, 255, 0.13), transparent 35%),
+    radial-gradient(circle at 80% 50%, rgba(255, 92, 54, 0.15), transparent 36%),
+    linear-gradient(90deg, rgba(83, 172, 80, 0.22), transparent 45%, rgba(72, 38, 31, 0.22));
+}
+
+body.dwarf-supermajority::after,
+body.orc-supermajority::after {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  box-shadow: inset 0 0 60px rgba(255, 214, 75, 0.78);
+  animation: pulse 900ms ease-in-out infinite alternate;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+#battlefield {
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  background: #15151c;
+  image-rendering: pixelated;
+}
+
+.hud {
+  position: absolute;
+  inset: 18px 18px auto;
+  padding: 14px;
+  border: 1px solid rgba(255, 226, 155, 0.32);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(13, 18, 27, 0.9), rgba(13, 18, 27, 0.66));
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+}
+
+.top-row,
+.bars,
+.actions,
+.structure {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.top-row {
+  justify-content: space-between;
+}
+
+.crest,
+.timer,
+.pot {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  padding: 10px 14px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.28);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+.crest {
+  min-width: 120px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.crest.dwarves {
+  color: #9fe0ff;
+  border-color: rgba(126, 224, 255, 0.45);
+}
+
+.crest.orcs {
+  color: #ffb386;
+  border-color: rgba(255, 120, 64, 0.45);
+}
+
+.pot {
+  min-width: 150px;
+}
+
+.pot span {
+  display: block;
+  color: #cbbf9d;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.pot strong,
+.timer {
+  font-family: "Courier New", monospace;
+  font-size: 1.25rem;
+}
+
+.bonus strong {
+  color: #ffd65a;
+}
+
+.timer {
+  min-width: 130px;
+  color: #f8f0d2;
+  font-weight: 900;
+}
+
+.timer.danger {
+  color: #ff5148;
+  animation: shake 150ms linear infinite;
+}
+
+.bars {
+  margin-top: 12px;
+}
+
+.bar-label {
+  width: 76px;
+  font: 800 0.9rem "Courier New", monospace;
+}
+
+.ownership {
+  flex: 1;
+  display: flex;
+  height: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32);
+}
+
+#dwarfBar {
+  background: linear-gradient(90deg, #2d7bd8, #78d7ff);
+  box-shadow: 0 0 22px rgba(105, 209, 255, 0.7);
+}
+
+#orcBar {
+  margin-left: auto;
+  background: linear-gradient(90deg, #f28c3a, #9a2224);
+  box-shadow: 0 0 22px rgba(255, 95, 42, 0.65);
+}
+
+.structure {
+  margin-top: 12px;
+  color: #dacfae;
+  font-size: 0.8rem;
+}
+
+.track {
+  position: relative;
+  flex: 1;
+  height: 16px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, transparent 29.8%, #ffd65a 30%, transparent 30.2%),
+    linear-gradient(90deg, transparent 69.8%, #ffd65a 70%, transparent 70.2%),
+    linear-gradient(90deg, #2d7bd8, #858077 50%, #9a2224);
+}
+
+#frontMarker {
+  position: absolute;
+  top: -7px;
+  width: 4px;
+  height: 30px;
+  border-radius: 4px;
+  background: #fff2a6;
+  box-shadow: 0 0 16px #ffd65a;
+  transform: translateX(-50%);
+}
+
+.tick {
+  position: absolute;
+  top: 18px;
+  color: #ffd65a;
+  font-style: normal;
+  font-size: 0.7rem;
+  transform: translateX(-50%);
+}
+
+.tick-left {
+  left: 30%;
+}
+
+.tick-right {
+  left: 70%;
+}
+
+.status {
+  margin-top: 24px;
+  color: #efe2bc;
+  font-size: 0.9rem;
+}
+
+.actions {
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+button,
+input {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  color: #fff8df;
+  background: rgba(16, 19, 28, 0.88);
+  font: inherit;
+}
+
+button {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-weight: 800;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(255, 214, 90, 0.72);
+  box-shadow: 0 0 20px rgba(255, 214, 90, 0.25);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #cbbf9d;
+  font-size: 0.86rem;
+}
+
+input {
+  width: 84px;
+  padding: 9px 10px;
+}
+
+.victory {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.72));
+}
+
+.victory h1 {
+  margin: 0;
+  color: #ffd65a;
+  font-size: clamp(2.4rem, 8vw, 7rem);
+  letter-spacing: 0.08em;
+  text-shadow:
+    0 0 18px rgba(255, 214, 90, 0.9),
+    0 8px 0 rgba(0, 0, 0, 0.6);
+}
+
+.victory p {
+  margin: 16px 0 0;
+  color: #fff7d8;
+  font: 900 clamp(1rem, 3vw, 2rem) "Courier New", monospace;
+}
+
+.hidden {
+  display: none;
+}
+
+.flash {
+  animation: flash 450ms ease;
+}
+
+@keyframes flash {
+  0% {
+    color: #fff;
+    text-shadow: 0 0 24px #ffd65a;
+  }
+  100% {
+    color: #f5ead2;
+    text-shadow: none;
+  }
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+
+@media (max-width: 760px) {
+  .hud {
+    inset: 8px;
+  }
+
+  .top-row,
+  .bars,
+  .structure {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .crest,
+  .pot,
+  .timer,
+  .bar-label {
+    width: 100%;
+  }
+}
