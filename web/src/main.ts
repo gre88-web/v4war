@@ -323,7 +323,12 @@ class BattleScene extends Phaser.Scene {
   }
 
   setGameState(next: GameState, previousFront: number): void {
+    const frontChanged = next.front !== this.currentState.front;
     this.currentState = { ...next };
+    if (!frontChanged) {
+      return;
+    }
+
     this.tweens.killTweensOf(this);
     this.tweens.add({
       targets: this,
@@ -337,7 +342,7 @@ class BattleScene extends Phaser.Scene {
     const { width, height } = this.dimensions();
     const hex = this.hexMetrics(width, height);
     const row = Math.floor(pseudoRandom(this.currentState.front + SEED + this.time.now) * HEX_ROWS);
-    const center = this.hexCenter(Math.floor(this.frontColumnForRow(row, this.time.now)), row, hex);
+    const center = this.hexCenter(Math.floor(this.frontColumnForRow(row)), row, hex);
     const x = center.x;
     const y = center.y;
     const color = faction === DWARVES ? 0x0036ff : 0xff0000;
@@ -399,7 +404,7 @@ class BattleScene extends Phaser.Scene {
     for (let col = 0; col < HEX_COLS; col += 1) {
       for (let row = 0; row < HEX_ROWS; row += 1) {
         const center = this.hexCenter(col, row, hex);
-        const owner = this.hexOwner(col, row, time);
+        const owner = this.hexOwner(col, row);
         const base = this.hexTerrainColor(col, row);
         this.drawHex(this.terrain, center.x, center.y, hex.size, base, 0.98, 0x314124, 0.2);
 
@@ -440,32 +445,18 @@ class BattleScene extends Phaser.Scene {
     this.drawGoalAura(width * 0.945, height * 0.53, time, 0xff7048);
   }
 
-  private drawFront(hex: HexMetrics, time: number): void {
+  private drawFront(hex: HexMetrics, _time: number): void {
     this.frontLine.clear();
-    for (let row = 0; row < HEX_ROWS; row += 1) {
-      const boundary = this.frontColumnForRow(row, time);
-      const center = this.hexCenter(Math.floor(boundary), row, hex);
-      this.frontLine.lineStyle(4, 0x0b1230, 0.78);
-      this.frontLine.strokeCircle(center.x, center.y, hex.size * 0.56);
-      this.frontLine.lineStyle(2, 0xffdf5c, 0.72);
-      this.frontLine.strokeCircle(center.x, center.y, hex.size * 0.42);
-      if (row % 2 === 0) {
-        this.frontLine.fillStyle(0xffdf5c, 0.85);
-        this.frontLine.fillRect(center.x - 2, center.y - hex.size * 0.58, 4, hex.size * 1.16);
-      }
-    }
+    const points = this.frontlinePoints(hex);
 
-    this.frontLine.lineStyle(5, 0xffdf5c, 0.38);
-    this.frontLine.beginPath();
-    for (let row = 0; row < HEX_ROWS; row += 1) {
-      const center = this.hexCenter(Math.floor(this.frontColumnForRow(row, time)), row, hex);
-      if (row === 0) {
-        this.frontLine.moveTo(center.x, center.y);
-      } else {
-        this.frontLine.lineTo(center.x, center.y);
-      }
+    this.drawSmoothFrontPath(points, 18, 0x2b170e, 0.62);
+    this.drawSmoothFrontPath(points, 12, 0x6a251f, 0.34);
+    this.drawSmoothFrontPath(points, 8, 0xffcc5b, 0.9);
+    this.drawSmoothFrontPath(points, 3, 0xfff0a4, 0.98);
+
+    for (let i = 1; i < points.length - 1; i += 2) {
+      this.drawFrontTick(points[i - 1], points[i], points[i + 1], hex.size);
     }
-    this.frontLine.strokePath();
   }
 
   private drawAtmosphere(width: number, height: number, time: number): void {
@@ -525,7 +516,7 @@ class BattleScene extends Phaser.Scene {
     const { width, height } = this.dimensions();
     const hex = this.hexMetrics(width, height);
     for (const unit of this.units) {
-      const frontCol = Math.floor(this.frontColumnForRow(unit.row, time));
+      const frontCol = Math.floor(this.frontColumnForRow(unit.row));
       const col =
         unit.side === DWARVES
           ? Phaser.Math.Clamp(frontCol - unit.columnOffset, 1, HEX_COLS - 2)
@@ -758,6 +749,72 @@ class BattleScene extends Phaser.Scene {
     });
   }
 
+  private frontlinePoints(hex: HexMetrics): Phaser.Math.Vector2[] {
+    const points: Phaser.Math.Vector2[] = [];
+    for (let row = -1; row <= HEX_ROWS; row += 1) {
+      const clampedRow = Phaser.Math.Clamp(row, 0, HEX_ROWS - 1);
+      const previous = this.frontColumnForRow(Phaser.Math.Clamp(clampedRow - 1, 0, HEX_ROWS - 1));
+      const current = this.frontColumnForRow(clampedRow);
+      const next = this.frontColumnForRow(Phaser.Math.Clamp(clampedRow + 1, 0, HEX_ROWS - 1));
+      const smoothedColumn = (previous + current * 2.6 + next) / 4.6;
+      const center = this.hexCenter(Math.round(smoothedColumn), clampedRow, hex);
+      points.push(new Phaser.Math.Vector2(center.x + hex.xStep * 0.42, center.y));
+    }
+    return points;
+  }
+
+  private drawSmoothFrontPath(
+    points: Phaser.Math.Vector2[],
+    width: number,
+    color: number,
+    alpha: number,
+  ): void {
+    if (points.length < 2) {
+      return;
+    }
+
+    this.frontLine.lineStyle(width, color, alpha);
+    this.frontLine.beginPath();
+    this.frontLine.moveTo(points[0].x, points[0].y);
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const start = points[i];
+      const end = points[i + 1];
+      const mid = new Phaser.Math.Vector2((start.x + end.x) / 2, (start.y + end.y) / 2);
+      if (i === 0) {
+        this.frontLine.lineTo(mid.x, mid.y);
+      } else {
+        const control = points[i];
+        this.frontLine.lineTo((control.x + mid.x) / 2, (control.y + mid.y) / 2);
+        this.frontLine.lineTo(mid.x, mid.y);
+      }
+    }
+    const last = points[points.length - 1];
+    this.frontLine.lineTo(last.x, last.y);
+    this.frontLine.strokePath();
+
+    this.frontLine.fillStyle(color, alpha);
+    for (const point of points) {
+      this.frontLine.fillCircle(point.x, point.y, width * 0.42);
+    }
+  }
+
+  private drawFrontTick(
+    previous: Phaser.Math.Vector2,
+    point: Phaser.Math.Vector2,
+    next: Phaser.Math.Vector2,
+    size: number,
+  ): void {
+    const tangent = new Phaser.Math.Vector2(next.x - previous.x, next.y - previous.y).normalize();
+    const normal = new Phaser.Math.Vector2(-tangent.y, tangent.x);
+    const start = new Phaser.Math.Vector2(point.x - normal.x * size * 0.16, point.y - normal.y * size * 0.16);
+    const end = new Phaser.Math.Vector2(point.x + normal.x * size * 0.82, point.y + normal.y * size * 0.82);
+
+    this.frontLine.lineStyle(7, 0x2b170e, 0.72);
+    this.frontLine.lineBetween(start.x, start.y, end.x, end.y);
+    this.frontLine.lineStyle(4, 0xffdc6d, 1);
+    this.frontLine.lineBetween(start.x, start.y, end.x, end.y);
+  }
+
   private drawSea(width: number, height: number, hex: HexMetrics): void {
     this.terrain.fillStyle(0x6f9da0, 0.95);
     this.terrain.beginPath();
@@ -892,15 +949,15 @@ class BattleScene extends Phaser.Scene {
     };
   }
 
-  private hexOwner(col: number, row: number, time: number): number {
-    return col <= this.frontColumnForRow(row, time) ? DWARVES : ORCS;
+  private hexOwner(col: number, row: number): number {
+    return col <= this.frontColumnForRow(row) ? DWARVES : ORCS;
   }
 
-  private frontColumnForRow(row: number, time: number): number {
+  private frontColumnForRow(row: number): number {
     const base = (this.renderedFront / TOTAL_TILES) * (HEX_COLS - 1);
     const noise = (pseudoRandom(row * 101 + SEED) - 0.5) * 5.4;
-    const wave = Math.sin(time / 950 + row * 0.63) * 1.1;
-    return Phaser.Math.Clamp(base + noise + wave, 0, HEX_COLS - 1);
+    const strategicBulge = Math.sin(row * 0.58 + SEED) * 1.05;
+    return Phaser.Math.Clamp(base + noise + strategicBulge, 0, HEX_COLS - 1);
   }
 
   private hexTerrainColor(col: number, row: number): number {
